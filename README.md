@@ -16,7 +16,7 @@ O dataset utilizado é uma versão do "Superstore", com informações sobre vend
 
 ### Total de Vendas por Categoria 
 Gráficos de barras destacando as categorias com maiores volumes de vendas.
-![imagens/grafico1-totalvendas-categoria-ingles.png]
+![Texto alternativo](imagens/grafico1-totalvendas-categoria-ingles.png)
 
 ### ✅ Lucro por Subcategoria
 Gráfico de barras mostrando quais subcategorias são mais e menos lucrativas.
