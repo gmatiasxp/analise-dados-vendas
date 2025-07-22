@@ -20,18 +20,18 @@ Gráficos de barras destacando as categorias com maiores volumes de vendas.
 
 ### ✅ Lucro por Subcategoria
 Gráfico de barras mostrando quais subcategorias são mais e menos lucrativas.
-imagens/grafico2-lucro-subcategoria-ingles.png
-imagens/grafico2-lucro-subcategoria-traduzido.png
+![Texto alternativo](imagens/grafico2-lucro-subcategoria-ingles.png)
+![Texto alternativo](imagens/grafico2-lucro-subcategoria-traduzido.png)
 
 ### 📅 Vendas Mensais
 Visualização da tendência de vendas ao longo do tempo.
-imagens/grafico3-vendas-mensais-ingles.png
-imagens/grafico2-lucro-subcategoria-traduzido.png
+![Texto alternativo](imagens/grafico3-vendas-mensais-ingles.png)
+![Texto alternativo](imagens/grafico2-lucro-subcategoria-traduzido.png)
 
 ### 🌍 Vendas por Região
 Comparação das vendas nas regiões: Sul, Norte, Leste e Central.
-imagens/grafico4-vendas-macroregiao-ingles.png
-imagens/grafico4-vendas-macroregião-traduzido.png
+![Texto alternativo](imagens/grafico4-vendas-macroregiao-ingles.png)
+![Texto alternativo](imagens/grafico4-vendas-macroregião-traduzido.png)
 
 ## 🌐 Tradução dos Gráficos
 
