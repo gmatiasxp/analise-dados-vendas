@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dashboard — Análise Superstore</title>
+  <!-- Tailwind CDN (usa classes utilitárias) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Plotly for interactive charts -->
+  <script src="https://cdn.plot.ly/plotly-2.20.0.min.js"></script>
+  <!-- PapaParse to load CSV in-browser -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <style>
+    body { font-family: Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; }
+    .card { @apply bg-white rounded-2xl shadow-md p-4; }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen p-6">
+  <header class="max-w-7xl mx-auto mb-6">
+    <div class="flex items-center justify-between">
+      <div>
+        <h1 class="text-2xl font-bold">Análise de Vendas — Superstore</h1>
+        <p class="text-sm text-gray-600">Dashboard de Monitoramento de Vendas</p>
+      </div>
+      <div class="flex gap-2">
+        <a id="linkedinBtn" class="px-4 py-2 rounded-xl border" href="#" target="_blank">LinkedIn</a>
+        <a id="whatsappBtn" class="px-4 py-2 rounded-xl bg-green-500 text-white" href="#" target="_blank">WhatsApp</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-4 gap-6">
+    <!-- Upload / Filters -->
+    <section class="lg:col-span-1 card">
+      <h2 class="font-semibold mb-2">Dados</h2>
+      <p class="text-sm text-gray-600 mb-3">Carregue um CSV com colunas mínimas: Data do pedido, vendas, lucro, categoria, subcategoria, região, cidade, código postal, nome do produto.</p>
+      <input id="fileInput" type="file" accept=".csv" class="mb-3" />
+
+      <label class="block text-sm font-medium">Período</label>
+      <input id="dateFrom" type="date" class="border rounded p-1 w-full mb-2" />
+      <input id="dateTo" type="date" class="border rounded p-1 w-full mb-4" />
+
+      <label class="block text-sm font-medium">Filtro Categoria</label>
+      <select id="categoryFilter" class="border rounded p-1 w-full mb-4">
+        <option value="">Todas</option>
+      </select>
+
+      <button id="applyFilters" class="w-full py-2 rounded-xl bg-blue-600 text-white">Aplicar</button>
+
+      <div class="mt-4 text-xs text-gray-500">
+        <p id="summary">Aguardando upload do arquivo...</p>
+      </div>
+    </section>
+
+    <!-- Main tiles and charts -->
+    <section class="lg:col-span-3">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+        <div class="card">
+          <small class="text-gray-500">Total de Vendas</small>
+          <div id="totalSales" class="text-2xl font-bold">—</div>
+        </div>
+        <div class="card">
+          <small class="text-gray-500">Total de Lucro</small>
+          <div id="totalProfit" class="text-2xl font-bold">—</div>
+        </div>
+        <div class="card">
+          <small class="text-gray-500">Ticket Médio</small>
+          <div id="avgTicket" class="text-2xl font-bold">—</div>
+        </div>
+      </div>
+
+      <div class="card mb-4">
+        <h3 class="font-semibold mb-2">Vendas ao longo do tempo</h3>
+        <div id="timeseries" style="height:360px;"></div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="card">
+          <h3 class="font-semibold mb-2">Lucro por Categoria</h3>
+          <div id="profitByCategory" style="height:320px;"></div>
+        </div>
+        <div class="card">
+          <h3 class="font-semibold mb-2">Top Produtos (por Vendas)</h3>
+          <div id="topProducts" style="height:320px;"></div>
+        </div>
+      </div>
+
+    </section>
+  </main>
+
+  <footer class="max-w-7xl mx-auto mt-6 text-center text-sm text-gray-500">
+    <p>Gabriela Matias, responsável pelo tratamento, análise e visualização dos dados.</p>
+  </footer>
+
+<script>
+// Utilitários
+function formatCurrency(x){
+  if(isNaN(x)) return '—';
+  return x.toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
+}
+
+let rawData = [];
+
+function parseDate(d){
+  // tenta suportar formatos comuns
+  let dt = new Date(d);
+  if(!isNaN(dt)) return dt;
+  // dd/mm/yyyy
+  const parts = d.split('/');
+  if(parts.length===3){
+    return new Date(parts[2], parts[1]-1, parts[0]);
+  }
+  return new Date(d);
+}
+
+function aggregateTimeseries(data){
+  const map = {};
+  data.forEach(r=>{
+    const day = r._date.toISOString().slice(0,10);
+    if(!map[day]) map[day]={sales:0, profit:0, count:0};
+    map[day].sales += +r.Sales || 0;
+    map[day].profit += +r.Profit || 0;
+    map[day].count += 1;
+  });
+  const days = Object.keys(map).sort();
+  return days.map(d=>({date:d, sales:map[d].sales, profit:map[d].profit}));
+}
+
+function updateSummary(filtered){
+  const totalSales = filtered.reduce((s,r)=>s + (+r.Sales || 0),0);
+  const totalProfit = filtered.reduce((s,r)=>s + (+r.Profit || 0),0);
+  const avgTicket = filtered.length ? totalSales / filtered.length : 0;
+  document.getElementById('totalSales').innerText = formatCurrency(totalSales);
+  document.getElementById('totalProfit').innerText = formatCurrency(totalProfit);
+  document.getElementById('avgTicket').innerText = formatCurrency(avgTicket);
+  document.getElementById('summary').innerText = `Registros: ${filtered.length} — Período: ${filtered.length? filtered[0]._date.toLocaleDateString() + ' até ' + filtered[filtered.length-1]._date.toLocaleDateString() : '—'}`;
+}
+
+function drawTimeSeries(filtered){
+  const agg = aggregateTimeseries(filtered);
+  const x = agg.map(d=>d.date);
+  const sales = agg.map(d=>d.sales);
+  const profit = agg.map(d=>d.profit);
+  const trace1 = { x, y: sales, name: 'Vendas', type: 'scatter', mode: 'lines+markers' };
+  const trace2 = { x, y: profit, name: 'Lucro', type: 'scatter', mode: 'lines+markers', yaxis: 'y2' };
+  const layout = { margin:{t:20}, yaxis:{title:'Vendas'}, yaxis2:{overlaying:'y', side:'right', title:'Lucro'}, legend:{orientation:'h'}};
+  Plotly.newPlot('timeseries', [trace1, trace2], layout, {responsive:true});
+}
+
+function drawProfitByCategory(filtered){
+  const map = {};
+  filtered.forEach(r=>{
+    const c = r.Category || 'Sem Categoria';
+    map[c] = (map[c]||0) + (+r.Profit||0);
+  });
+  const cats = Object.keys(map);
+  const vals = cats.map(k=>map[k]);
+  const data = [{ labels: cats, values: vals, type: 'pie', textinfo:'label+percent'}];
+  Plotly.newPlot('profitByCategory', data, {margin:{t:10}}, {responsive:true});
+}
+
+function drawTopProducts(filtered){
+  const map = {};
+  filtered.forEach(r=>{
+    const p = r['Product Name'] || r['Product'] || 'Produto desconhecido';
+    map[p] = (map[p]||0) + (+r.Sales||0);
+  });
+  const entries = Object.entries(map).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  const names = entries.map(e=>e[0]);
+  const vals = entries.map(e=>e[1]);
+  const data = [{ x: vals.reverse(), y: names.reverse(), type: 'bar', orientation:'h' }];
+  Plotly.newPlot('topProducts', data, {margin:{t:10}}, {responsive:true});
+}
+
+function refreshVisuals(filtered){
+  filtered.sort((a,b)=>a._date - b._date);
+  updateSummary(filtered);
+  drawTimeSeries(filtered);
+  drawProfitByCategory(filtered);
+  drawTopProducts(filtered);
+}
+
+function applyFilters(){
+  let filtered = rawData.slice();
+  const cat = document.getElementById('categoryFilter').value;
+  const from = document.getElementById('dateFrom').value;
+  const to = document.getElementById('dateTo').value;
+  if(cat) filtered = filtered.filter(r=>r.Category === cat);
+  if(from) filtered = filtered.filter(r=> r._date >= new Date(from));
+  if(to) filtered = filtered.filter(r=> r._date <= new Date(to));
+  refreshVisuals(filtered);
+}
+
+document.getElementById('applyFilters').addEventListener('click', applyFilters);
+
+// File load
+document.getElementById('fileInput').addEventListener('change', function(e){
+  const f = e.target.files[0];
+  if(!f) return;
+  Papa.parse(f, { header:true, skipEmptyLines:true,
+    complete: function(results){
+      rawData = results.data.map(r=>{
+        // normalize keys (trim)
+        const newR = {};
+        Object.keys(r).forEach(k=> newR[k.trim()] = r[k]);
+        // parse date
+        newR._rawDate = newR['Order Date'] || newR['OrderDate'] || newR['Date'] || '';
+        newR._date = parseDate(newR._rawDate);
+        // ensure numeric fields
+        newR.Sales = parseFloat((newR.Sales||newR.SalesAmount||0).toString().replace(',','')) || 0;
+        newR.Profit = parseFloat((newR.Profit||0).toString().replace(',','')) || 0;
+        return newR;
+      }).filter(r=>!isNaN(r._date));
+
+      // populate category filter
+      const cats = Array.from(new Set(rawData.map(r=>r.Category).filter(Boolean))).sort();
+      const sel = document.getElementById('categoryFilter');
+      sel.innerHTML = '<option value="">Todas</option>' + cats.map(c=>`<option value="${c}">${c}</option>`).join('');
+
+      // set default date range
+      if(rawData.length){
+        const dates = rawData.map(r=>r._date).sort((a,b)=>a-b);
+        document.getElementById('dateFrom').value = dates[0].toISOString().slice(0,10);
+        document.getElementById('dateTo').value = dates[dates.length-1].toISOString().slice(0,10);
+      }
+
+      applyFilters();
+    }
+  });
+});
+
+// Default linkedin / whatsapp
+const linkedinBtn = document.getElementById('linkedinBtn');
+const whatsappBtn = document.getElementById('whatsappBtn');
+linkedinBtn.href = 'https://www.linkedin.com/in/gabriela-matiasnascimento/';
+whatsappBtn.href = 'https://wa.me/5581999282386';
+
+</script>
+</body>
+</html>
